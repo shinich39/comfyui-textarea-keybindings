@@ -178,6 +178,8 @@ function shortcutHandler(e) {
     return;
   }
 
+  let addHistory = false;
+
   let oldRange = getSelectionRange(e.target);
   let oldText = e.target.value;
 
@@ -295,14 +297,16 @@ function shortcutHandler(e) {
   e.target.focus();
   e.target.setSelectionRange(newRange[0], newRange[1]);
 
-  chkElement(e);
+  if (addHistory) {
+    chkElement(e);
 
-  histories.push({
-    oldText: oldText,
-    newText: newText,
-    oldRange: oldRange,
-    newRange: newRange,
-  });
+    histories.push({
+      oldText: oldText,
+      newText: newText,
+      oldRange: oldRange,
+      newRange: newRange,
+    });
+  }
 } 
 
 function undoHandler(e) {
