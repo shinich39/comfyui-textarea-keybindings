@@ -262,6 +262,7 @@ function shortcutHandler(e) {
     }
 
     newText = currLeft+currCenter+currRight;
+    addHistory = true;
   } else if (shortcut === "next") {
     if (prevCenter.trim() === currCenter.trim()) {
       let rfc = currRight.indexOf(",");
@@ -294,14 +295,14 @@ function shortcutHandler(e) {
   e.target.focus();
   e.target.setSelectionRange(newRange[0], newRange[1]);
 
-  // chkElement(e);
+  chkElement(e);
 
-  // histories.push({
-  //   oldText: oldText,
-  //   newText: newText,
-  //   oldRange: oldRange,
-  //   newRange: newRange,
-  // });
+  histories.push({
+    oldText: oldText,
+    newText: newText,
+    oldRange: oldRange,
+    newRange: newRange,
+  });
 } 
 
 function undoHandler(e) {
