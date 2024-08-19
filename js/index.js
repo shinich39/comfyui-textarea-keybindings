@@ -368,6 +368,7 @@ app.registerExtension({
       return r;
     };
 	},
+  // remove annotations
   nodeCreated(node) {
 		if (node.widgets) {
 			// Locate dynamic prompt text widgets
@@ -378,13 +379,13 @@ app.registerExtension({
 			for (const widget of widgets) {
 				// Override the serialization of the value to resolve dynamic prompts for all widgets supporting it in this node
         const origSerializeValue = widget.serializeValue;
-        widget.serializeValue = function(workflowNode, widgetIndex) {
-          let r = origSerializeValue?.apply(this, arguments);
-
-          // remove annotations
-          let re = /\/\*(.(?!\/\*))+\*\/|\/\*\*\//g;
-          r = r.replace(re, "");
-
+        widget.serializeValue = async function(workflowNode, widgetIndex) {
+          let r = await origSerializeValue?.apply(this, arguments);
+          try {
+            r = r.replace(/\/\*((.|\s)(?!\/\*))+\*\/|\/\*\*\//g, "");
+          } catch(err) {
+            console.error(err);
+          }
           return r;
         }
 			}
