@@ -179,17 +179,13 @@ function shortcutHandler(e) {
   }
 
   let addHistory = false;
-
   let oldRange = getSelectionRange(e.target);
   let oldText = e.target.value;
-
   let newRange = [oldRange[0],oldRange[1]];
   let newText = oldText;
-
   let prevLeft = oldText.substring(0, oldRange[0]);
   let prevCenter = oldText.substring(oldRange[0], oldRange[1]);
   let prevRight = oldText.substring(oldRange[1]);
-  
   let currLeft = prevLeft;
   let currCenter = prevCenter;
   let currRight = prevRight;
@@ -250,16 +246,21 @@ function shortcutHandler(e) {
       }
       currRight = currRight.substring(0, rra) + currRight.substring(rra + 2);
     } else {
-      currCenter = currCenter.replace(/\/\*|\*\//g, ""); // remove annotation
       if (cla > -1 && cra > -1) {
         newRange[0] += Math.max(-2, Math.min(0, cla - clc));
         newRange[1] += Math.max(-2, Math.min(0, cla - crc));
         newRange[0] += Math.max(-2, Math.min(0, cra - clc));
         newRange[1] += Math.max(-2, Math.min(0, cra - crc));
+        currCenter = currCenter.replace(/\/\*|\*\//g, ""); // remove annotations
       } else {
-        newRange[0] += 2;
-        newRange[1] += 2;
-        currCenter = `/*${currCenter}*/`;
+        const trimmedCenter = currCenter.trim();
+        const ctl = currCenter.indexOf(trimmedCenter);
+        const ctr = ctl + trimmedCenter.length;
+        newRange[0] += ctl <= clc ? 2 : 0;
+        newRange[1] += ctl <= crc ? 2 : 0;
+        newRange[0] += ctr < clc ? 2 : 0;
+        newRange[1] += ctr < crc ? 2 : 0;
+        currCenter = `${currCenter.substring(0, ctl)}/*${currCenter.substring(ctl, ctr)}*/${currCenter.substring(ctr)}`;
       }
     }
 
