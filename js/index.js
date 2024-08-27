@@ -25,6 +25,7 @@ const SHORTCUTS = {
   "Ctrl+z": undoHandler,
   "Tab": "next",
   "Ctrl+/": "annotation",
+  // "Shift+(": "weight",
   // "Ctrl+ArrowUp": "incWeight", // /web/extensions/core/editAttentio.js/init/editAttension
   // "Ctrl+ArrowDown": "decWeight", // /web/extensions/core/editAttentio.js/init/editAttension
 }
@@ -211,7 +212,6 @@ function shortcutHandler(e) {
   }
 
   if (shortcut === "annotation") {
-    // check exists annotation
     let lla = currLeft.lastIndexOf(ANNOTATION[0]);
     let lra = currLeft.lastIndexOf(ANNOTATION[1]);
     let cla = currCenter.indexOf(ANNOTATION[0]);
@@ -220,8 +220,6 @@ function shortcutHandler(e) {
     let rra = currRight.indexOf(ANNOTATION[1]);
     let clc = oldRange[0] - currLeft.length;
     let crc = oldRange[1] - currLeft.length;
-
-    // check left annotation
     if (lla > lra || (lla !== -1 && lra === -1)) {
       if (cra > -1) {
         currCenter = currCenter.substring(0, cra) + currCenter.substring(cra + 2);
@@ -234,7 +232,6 @@ function shortcutHandler(e) {
       newRange[0] -= 2;
       newRange[1] -= 2;
     } else if (rla > rra || (rla === -1 && rra !== -1)) {
-      // check right annotation
       if (cla > -1) {
         currCenter = currCenter.substring(0, cla) + currCenter.substring(cla + 2);
         newRange[0] += Math.max(-2, Math.min(0, cla - clc));
@@ -263,7 +260,57 @@ function shortcutHandler(e) {
         currCenter = `${currCenter.substring(0, ctl)}/*${currCenter.substring(ctl, ctr)}*/${currCenter.substring(ctr)}`;
       }
     }
-
+    newText = currLeft+currCenter+currRight;
+    addHistory = true;
+  } else if (shortcut === "weight") {
+    let lla = currLeft.lastIndexOf("(");
+    let lra = currLeft.lastIndexOf(")");
+    let cla = currCenter.indexOf("(");
+    let cra = currCenter.indexOf(")");
+    let rla = currRight.indexOf("(");
+    let rra = currRight.indexOf(")");
+    let clc = oldRange[0] - currLeft.length;
+    let crc = oldRange[1] - currLeft.length;
+    if (lla > lra || (lla !== -1 && lra === -1)) {
+      if (cra > -1) {
+        currCenter = currCenter.substring(0, cra) + currCenter.substring(cra + 1);
+        newRange[0] += Math.max(-1, Math.min(0, cra - clc));
+        newRange[1] += Math.max(-1, Math.min(0, cra - crc));
+      } else if (rra > -1) {
+        currRight = currRight.substring(0, rra) + currRight.substring(rra + 1);
+      }
+      currLeft = currLeft.substring(0, lla) + currLeft.substring(lla + 1);
+      newRange[0] -= 1;
+      newRange[1] -= 1;
+    } else if (rla > rra || (rla === -1 && rra !== -1)) {
+      if (cla > -1) {
+        currCenter = currCenter.substring(0, cla) + currCenter.substring(cla + 1);
+        newRange[0] += Math.max(-1, Math.min(0, cla - clc));
+        newRange[1] += Math.max(-1, Math.min(0, cla - crc));
+      } else if (lla > -1) {
+        currLeft = currLeft.substring(0, lla) + currLeft.substring(lla + 1);
+        newRange[0] -= 1;
+        newRange[1] -= 1;
+      }
+      currRight = currRight.substring(0, rra) + currRight.substring(rra + 1);
+    } else {
+      if (cla > -1 && cra > -1) {
+        newRange[0] += Math.max(-1, Math.min(0, cla - clc));
+        newRange[1] += Math.max(-1, Math.min(0, cla - crc));
+        newRange[0] += Math.max(-1, Math.min(0, cra - clc));
+        newRange[1] += Math.max(-1, Math.min(0, cra - crc));
+        currCenter = currCenter.replace(/\(|\)/g, "");
+      } else {
+        const trimmedCenter = currCenter.trim();
+        const ctl = currCenter.indexOf(trimmedCenter);
+        const ctr = ctl + trimmedCenter.length;
+        newRange[0] += ctl <= clc ? 1 : 0;
+        newRange[1] += ctl <= crc ? 1 : 0;
+        newRange[0] += ctr < clc ? 1 : 0;
+        newRange[1] += ctr < crc ? 1 : 0;
+        currCenter = `${currCenter.substring(0, ctl)}(${currCenter.substring(ctl, ctr)})${currCenter.substring(ctr)}`;
+      }
+    }
     newText = currLeft+currCenter+currRight;
     addHistory = true;
   } else if (shortcut === "next") {
@@ -325,6 +372,33 @@ function undoHandler(e) {
   }
 }
 
+// web/extensions/core/dynamicPrompts.js
+function origDynamicPrompts(workflowNode, widgetIndex) {
+  function stripComments(str) {
+    return str.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g,'');
+  }
+
+  let prompt = stripComments(this.value);
+  while (prompt.replace("\\{", "").includes("{") && prompt.replace("\\}", "").includes("}")) {
+    const startIndex = prompt.replace("\\{", "00").indexOf("{");
+    const endIndex = prompt.replace("\\}", "00").indexOf("}");
+
+    const optionsString = prompt.substring(startIndex + 1, endIndex);
+    const options = optionsString.split("|");
+
+    const randomIndex = Math.floor(Math.random() * options.length);
+    const randomOption = options[randomIndex];
+
+    prompt = prompt.substring(0, startIndex) + randomOption + prompt.substring(endIndex + 1);
+  }
+
+  // Overwrite the value in the serialized workflow pnginfo
+  if (workflowNode?.widgets_values)
+    workflowNode.widgets_values[widgetIndex] = prompt;
+
+  return prompt;
+}
+
 app.registerExtension({
 	name: "shinich39.TextareaKeybindings",
 	init() {
@@ -379,14 +453,24 @@ app.registerExtension({
 			);
 			for (const widget of widgets) {
 				// Override the serialization of the value to resolve dynamic prompts for all widgets supporting it in this node
-        const origSerializeValue = widget.serializeValue;
-        widget.serializeValue = async function(workflowNode, widgetIndex) {
-          let r = await origSerializeValue?.apply(this, arguments);
+        // const origSerializeValue = widget.serializeValue;
+        widget.serializeValue = function(workflowNode, widgetIndex) {
+          // let r = await origSerializeValue?.apply(this, arguments);
+
+          // Why web/extensions/core/dynamicPrompts.js not applied?
+          let r = widget.value;
+          try {
+            r = origDynamicPrompts.apply(widget, arguments);
+          } catch(err) {
+            console.error(err);
+          }
+
           try {
             r = r.replace(/\/\*((.|\s)(?!\/\*))+\*\/|\/\*\*\//g, "");
           } catch(err) {
             console.error(err);
           }
+
           return r;
         }
 			}
